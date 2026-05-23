@@ -2,302 +2,163 @@
 
 **Days:** May 22–23  
 **Owner:** All 3 members together  
-**Goal:** A running FastAPI app connected to PostgreSQL with all models defined. Every member must be able to run the project locally before this milestone closes.
+**Goal:** A running FastAPI app connected to PostgreSQL, with all database models defined and a seed row in the `niches` table. Every member must run the project locally before this milestone closes.
 
-> Nothing in Milestone 1 or later can start until this is done. Do not split work until every member has the app running.
+> Nothing in Milestone 1 or later starts until every member has the app running. Do not split work yet.
 
 ---
 
 ## Prerequisites
 
 - Python 3.12 installed
-- **Docker + Docker Compose installed** (replaces local PostgreSQL — see Task 6)
-- Node.js 18+ installed (for frontend later)
+- Docker + Docker Compose installed (used for the local database — no manual PostgreSQL setup)
+- Node.js 18+ installed (needed in Milestone 1 for the frontend)
 - Git configured
+
+**Read first:** [`stack-guide.md`](stack-guide.md) — sections on FastAPI, SQLAlchemy, and python-dotenv.
 
 ---
 
-## Tasks
+## What you are building
 
-### 1. Initialize the repository
+A FastAPI app that:
+1. Connects to a PostgreSQL database via SQLAlchemy
+2. Creates all tables automatically on startup
+3. Seeds the `niches` table with one row ("Gym & Sports")
+4. Exposes a `GET /health` endpoint that returns `{"status": "ok"}`
 
-Create the folder structure below. Do not create files you don't need yet — empty folders with a `.gitkeep` are fine.
+There is no auth, no business logic, and no external API calls yet. Just the skeleton.
+
+---
+
+## Step 1 — Repository structure
+
+Agree on a folder structure before anyone writes code. A suggested layout:
 
 ```
 promobot/
 ├── backend/
 │   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py
-│   │   ├── database.py
-│   │   └── models/
-│   │       ├── __init__.py
-│   │       ├── niche.py
-│   │       ├── user.py
-│   │       └── promotion.py
-│   ├── .env
-│   ├── .env.example
+│   │   ├── main.py        ← FastAPI app entry point
+│   │   ├── database.py    ← SQLAlchemy engine and session
+│   │   └── models/        ← one file per model group
+│   ├── .env               ← local secrets, never committed
+│   ├── .env.example       ← template with placeholder values, committed
 │   └── requirements.txt
-├── frontend/            ← leave empty for now
+├── frontend/              ← leave empty for now
 ├── docs/
+├── docker-compose.yml
 ├── .gitignore
-├── CLAUDE.md
-└── README.md
+└── CLAUDE.md
 ```
 
-**`.gitignore` must include:**
-```
-__pycache__/
-*.pyc
-.env
-venv/
-.venv/
-node_modules/
-dist/
-```
-
-`docker-compose.yml` **is committed** — everyone uses it. Docker volume data lives outside the repo and is never committed.
-
-**`.env.example`** (commit this, never commit `.env`):
-```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/promobot
-RABBITMQ_URL=amqp://user:password@host/vhost
-MERCADOLIVRE_CLIENT_ID=your_client_id
-MERCADOLIVRE_CLIENT_SECRET=your_client_secret
-MERCADOLIVRE_AFFILIATE_ID=your_affiliate_id
-GEMINI_API_KEY=your_gemini_key
-JWT_SECRET=change_this_to_a_long_random_string
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_HOURS=24
-```
-
-Each member creates their own `.env` from this template.
+**Important:** `.env` must be in `.gitignore` from the first commit. Commit `.env.example` instead.
 
 ---
 
-### 2. Python virtual environment and dependencies
+## Step 2 — Python environment and dependencies
 
+Research: Python virtual environments (`venv`), `pip install`, `pip freeze`.
+
+Create a virtual environment inside `backend/`, activate it, and install the project dependencies. The full list of packages needed for the entire project is in `CLAUDE.md`. Install them all now so `requirements.txt` is complete from the start.
+
+Conceptual reminder — virtual environments isolate project dependencies:
 ```bash
-cd backend
 python3.12 -m venv venv
-source venv/bin/activate       # Linux/Mac
-# venv\Scripts\activate        # Windows
-
-pip install fastapi uvicorn[standard] sqlalchemy psycopg2-binary python-dotenv pydantic pydantic-settings bcrypt pyjwt httpx aio-pika google-generativeai
-
+source venv/bin/activate   # activates the environment
+pip install <packages>
 pip freeze > requirements.txt
 ```
 
-**Why these packages:**
-- `fastapi` + `uvicorn` — the web server
-- `sqlalchemy` — ORM for interacting with PostgreSQL
-- `psycopg2-binary` — PostgreSQL driver for SQLAlchemy
-- `python-dotenv` — loads `.env` into environment variables
-- `pydantic` / `pydantic-settings` — data validation and settings management
-- `bcrypt` — password hashing
-- `pyjwt` — JWT creation and verification
-- `httpx` — async HTTP client for calling Mercado Livre and Gemini
-- `aio-pika` — async RabbitMQ client (added now so it's in requirements, configured in M3)
-- `google-generativeai` — Gemini SDK
-
 ---
 
-### 3. Database connection (`app/database.py`)
+## Step 3 — Environment variables
 
-This file sets up SQLAlchemy to connect to PostgreSQL and provides a session dependency for FastAPI routes.
+Research: `python-dotenv`, `os.getenv()`.
 
-```python
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
-import os
-from dotenv import load_dotenv
+Create `.env.example` with all the variable names the project needs (see `CLAUDE.md` for the full list) but with placeholder values. Each member creates their own `.env` from this template and fills in real values.
 
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-class Base(DeclarativeBase):
-    pass
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+The app should read these variables using `python-dotenv`. The database connection string follows this format:
 ```
-
-**How it works:**
-- `create_engine` opens a connection pool to PostgreSQL.
-- `SessionLocal` is a factory that creates database sessions.
-- `get_db` is a FastAPI dependency — routes declare `db: Session = Depends(get_db)` and get a fresh session per request, automatically closed when done.
-- `Base` is the base class all models will inherit from.
-
----
-
-### 4. SQLAlchemy models
-
-#### `app/models/niche.py`
-```python
-from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import relationship
-from app.database import Base
-
-class Niche(Base):
-    __tablename__ = "niches"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, unique=True)
-    ml_category_id = Column(String, nullable=False)
-
-    promotions = relationship("Promotion", back_populates="niche")
-    users = relationship("User", secondary="user_niches", back_populates="niches")
-```
-
-#### `app/models/user.py`
-```python
-from sqlalchemy import Column, Integer, String, DateTime, Table, ForeignKey
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
-
-user_niches = Table(
-    "user_niches",
-    Base.metadata,
-    Column("user_id", Integer, ForeignKey("users.id"), primary_key=True),
-    Column("niche_id", Integer, ForeignKey("niches.id"), primary_key=True),
-)
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, nullable=False, unique=True, index=True)
-    hashed_password = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    niches = relationship("Niche", secondary=user_niches, back_populates="users")
-```
-
-#### `app/models/promotion.py`
-```python
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from app.database import Base
-
-class Product(Base):
-    __tablename__ = "products"
-
-    id = Column(Integer, primary_key=True, index=True)
-    ml_product_id = Column(String, nullable=False, unique=True, index=True)
-    title = Column(String, nullable=False)
-    photo_url = Column(String)
-    gemini_description = Column(String)
-    store = Column(String, nullable=False, default="mercadolivre")
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    promotions = relationship("Promotion", back_populates="product")
-
-class Promotion(Base):
-    __tablename__ = "promotions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    niche_id = Column(Integer, ForeignKey("niches.id"), nullable=False)
-    original_price = Column(Numeric(10, 2), nullable=False)
-    promo_price = Column(Numeric(10, 2), nullable=False)
-    affiliate_url = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-
-    product = relationship("Product", back_populates="promotions")
-    niche = relationship("Niche", back_populates="promotions")
-```
-
-**Why `Numeric(10, 2)` for prices?** Floating-point types (`Float`, `Double`) have rounding errors. `Numeric(10, 2)` stores exact decimal values — essential for money.
-
-#### `app/models/__init__.py`
-Import all models here so SQLAlchemy knows they exist when creating tables:
-```python
-from app.models.niche import Niche
-from app.models.user import User, user_niches
-from app.models.promotion import Product, Promotion
+postgresql://user:password@host:port/database_name
 ```
 
 ---
 
-### 5. FastAPI app entry point (`app/main.py`)
+## Step 4 — Database connection
 
-```python
-from fastapi import FastAPI
-from app.database import engine, Base
-from app.models import Niche, User, Product, Promotion  # ensures models are registered
+Research: SQLAlchemy's `create_engine`, `sessionmaker`, `DeclarativeBase`, and the `get_db` dependency pattern for FastAPI.
 
-app = FastAPI(title="PromoBot API")
+Create `app/database.py`. This file is responsible for:
+- Creating the SQLAlchemy engine from the `DATABASE_URL` environment variable
+- Providing a `SessionLocal` factory for creating database sessions
+- Defining a `Base` class that all models will inherit from
+- Providing a `get_db` function that FastAPI routes will use as a dependency to get a database session
 
-@app.on_event("startup")
-def startup():
-    Base.metadata.create_all(bind=engine)
-    seed_niches()
-
-def seed_niches():
-    from sqlalchemy.orm import Session
-    from app.models.niche import Niche
-    db = Session(engine)
-    try:
-        if not db.query(Niche).first():
-            db.add(Niche(name="Gym & Sports", ml_category_id="MS174162"))
-            db.commit()
-    finally:
-        db.close()
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-```
-
-**Why `create_all` on startup?** For now, SQLAlchemy creates the tables from your models automatically. This avoids needing Alembic migrations while the schema is still changing. Once the schema stabilizes, Alembic can be added.
-
-**`ml_category_id` for Gym & Sports:** Mercado Livre's category ID for "Esportes e Fitness" is `MS174162`. Verify this in the ML API explorer if needed.
+Think about: why does `get_db` use `yield` instead of `return`? Research Python generator functions and FastAPI's dependency lifecycle.
 
 ---
 
-### 6. Start the database with Docker Compose
+## Step 5 — Database models
 
-No manual PostgreSQL setup needed. The `docker-compose.yml` at the project root spins up PostgreSQL 16 with the correct database name, user, and password already configured.
+Research: SQLAlchemy ORM models, `Column`, data types (`Integer`, `String`, `DateTime`, `Numeric`, `ForeignKey`), `relationship`, many-to-many associations with a secondary table.
+
+Define the following models. Think carefully about which fields each entity needs before writing any code — refer to the data model in `CLAUDE.md`.
+
+- **Niche** — maps to a `niches` table
+- **User** — maps to a `users` table
+- **user_niches** — a join table (not a full model, just a `Table` definition) for the many-to-many between User and Niche
+- **Product** — maps to a `products` table
+- **Promotion** — maps to a `promotions` table
+
+Key questions to answer through research:
+- How do you define a many-to-many relationship in SQLAlchemy without creating a full model class for the join table?
+- What SQLAlchemy type should you use for monetary values (prices)? Why not `Float`?
+- What does `server_default=func.now()` do on a `DateTime` column?
+- What does `back_populates` do in a `relationship`?
+
+Organize models into separate files under `app/models/` and create an `__init__.py` that imports all of them. SQLAlchemy needs to "see" all models before it can create tables.
+
+---
+
+## Step 6 — Start the database with Docker Compose
+
+The `docker-compose.yml` at the project root starts a PostgreSQL 16 container with the correct database name, user, and password already configured.
 
 ```bash
-# From the project root (where docker-compose.yml lives)
+# from the project root
 docker compose up -d
 ```
 
-The `-d` flag runs it in the background. The database is now available at `localhost:5432`.
+This is all any member needs to do — no manual database creation required. The database is available at `localhost:5432`.
 
-Your `.env` should already have:
-```
-DATABASE_URL=postgresql://promobot_user:promobot_pass@localhost:5432/promobot
-```
-
-**Useful commands:**
+Useful commands:
 ```bash
-docker compose up -d       # start the DB
-docker compose down        # stop and remove the container (data is preserved in the volume)
-docker compose down -v     # stop and delete all data (full reset)
+docker compose up -d       # start in background
+docker compose down        # stop (data is preserved)
+docker compose down -v     # stop and wipe all data (full reset)
 docker compose logs db     # view PostgreSQL logs
 ```
 
-**Why a named volume (`postgres_data`)?**  
-Docker volumes persist data between container restarts. If you run `docker compose down` and `up` again, your data is still there. Only `docker compose down -v` wipes it — useful when you want a clean slate.
-
-**All members use the same credentials** — no one needs to create users or databases manually.
+Update your `.env` so `DATABASE_URL` points to `localhost:5432` with the credentials defined in `docker-compose.yml`.
 
 ---
 
-### 7. Run and verify
+## Step 7 — FastAPI app entry point
+
+Research: FastAPI's `lifespan` context manager (the modern replacement for `@app.on_event("startup")`), `Base.metadata.create_all()`.
+
+Create `app/main.py`. It should:
+1. Define a `lifespan` function that runs on app startup and shutdown
+2. On startup: call `create_all` to create all tables from your models, then seed the `niches` table if it is empty
+3. Create the FastAPI `app` instance using the `lifespan`
+4. Define a `GET /health` route that returns `{"status": "ok"}`
+
+For seeding: query the `Niche` table — if it has no rows, insert one for "Gym & Sports". Research the Mercado Livre category API or the developer docs to find the correct category ID for sports/fitness.
+
+---
+
+## Step 8 — Run and verify
 
 ```bash
 cd backend
@@ -305,28 +166,18 @@ source venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
-Expected output:
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Application startup complete.
-```
-
-Test the health endpoint:
-```bash
-curl http://localhost:8000/health
-# Expected: {"status":"ok"}
-```
-
-Open the auto-generated docs: http://localhost:8000/docs
-
-Verify tables were created:
-```bash
-docker compose exec db psql -U promobot_user -d promobot -c "\dt"
-# Should list: niches, users, user_niches, products, promotions
-
-docker compose exec db psql -U promobot_user -d promobot -c "SELECT * FROM niches;"
-# Should show: 1 | Gym & Sports | MS174162
-```
+Verify:
+- The app starts without errors
+- `GET /health` returns `{"status": "ok"}` (test with curl or the browser)
+- The auto-generated docs load at http://localhost:8000/docs
+- Tables exist in the database:
+  ```bash
+  docker compose exec db psql -U promobot_user -d promobot -c "\dt"
+  ```
+- The `niches` table has one row:
+  ```bash
+  docker compose exec db psql -U promobot_user -d promobot -c "SELECT * FROM niches;"
+  ```
 
 ---
 
@@ -334,7 +185,7 @@ docker compose exec db psql -U promobot_user -d promobot -c "SELECT * FROM niche
 
 - [ ] All 3 members can clone the repo and run the app with `uvicorn app.main:app --reload`
 - [ ] `GET /health` returns `{"status": "ok"}`
-- [ ] All 5 tables exist in PostgreSQL (`niches`, `users`, `user_niches`, `products`, `promotions`)
-- [ ] The `niches` table has one row: "Gym & Sports"
-- [ ] `.env` is in `.gitignore` and is NOT committed
-- [ ] `requirements.txt` is committed and up to date
+- [ ] All 5 tables exist: `niches`, `users`, `user_niches`, `products`, `promotions`
+- [ ] `niches` table has one row: "Gym & Sports"
+- [ ] `.env` is not committed; `.env.example` is committed with placeholder values
+- [ ] `requirements.txt` is committed and complete

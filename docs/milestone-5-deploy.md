@@ -2,126 +2,103 @@
 
 **Days:** May 31  
 **Owners:** Person B (Render + CloudAMQP) · Person C (Vercel) · All (smoke test)  
-**Goal:** The full application is running in production. All three members verify the end-to-end flow on the live URLs before the June 1 deadline.
+**Goal:** The full application is live in production. All members verify the end-to-end flow on real URLs before the June 1 deadline.
 
 > **Prerequisite:** All features from Milestones 1–4 are working locally.
 
 ---
 
-## Task B-1: Deploy backend to Render — Person B
+## Concepts to research
 
-### Step 1: Prepare the backend for production
+**Environment variables in production:**
+- Never commit `.env` — production env vars are set through the hosting platform's UI
+- Each platform (Render, Vercel) has an "Environment Variables" section in the project settings
+- Vite environment variables must be prefixed with `VITE_` and are baked into the build at compile time — they are not runtime variables
 
-Render expects your app to be startable with a single shell command. Add a `Procfile` (or just note the start command):
+**What changes when you go to production:**
+- The FastAPI app must bind to `0.0.0.0` (all interfaces), not `127.0.0.1` (localhost only)
+- The port must come from the `$PORT` environment variable set by Render
+- CORS must explicitly allow your Vercel domain (not just localhost)
+- The database URL changes from `localhost` to the managed Render PostgreSQL URL
 
-```
-# backend/Procfile
-web: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-```
-
-Render sets the `$PORT` environment variable automatically. `--host 0.0.0.0` is required so Render's load balancer can reach the app.
-
-Also add a `runtime.txt` to specify the Python version:
-```
-# backend/runtime.txt
-python-3.12.0
-```
-
-### Step 2: Create the PostgreSQL database on Render
-
-1. Go to https://render.com → New → PostgreSQL
-2. Name: `promobot-db`
-3. Plan: Free
-4. Click "Create Database"
-5. Copy the **Internal Database URL** (used when both services are on Render) and the **External Database URL** (used for local access if needed)
-
-### Step 3: Create the web service on Render
-
-1. New → Web Service → connect your GitHub repo
-2. Settings:
-   - **Root Directory:** `backend`
-   - **Runtime:** Python
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - **Plan:** Free
-
-### Step 4: Set environment variables on Render
-
-In the web service settings → Environment, add:
-
-```
-DATABASE_URL          = <Internal Database URL from step 2>
-RABBITMQ_URL          = <CloudAMQP AMQP URL — see Task B-2>
-MERCADOLIVRE_CLIENT_ID     = your_client_id
-MERCADOLIVRE_CLIENT_SECRET = your_client_secret
-MERCADOLIVRE_AFFILIATE_ID  = your_affiliate_id
-GEMINI_API_KEY        = your_gemini_key
-JWT_SECRET            = <generate a long random string>
-JWT_ALGORITHM         = HS256
-JWT_EXPIRE_HOURS      = 24
-```
-
-**Generating a secure `JWT_SECRET`:**
-```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
-```
-
-### Step 5: Deploy
-
-Click "Deploy" (or push to your main branch — Render deploys automatically on push).
-
-Watch the build logs. Common issues:
-- **`psycopg2` build failure** — make sure `psycopg2-binary` is in `requirements.txt`, not `psycopg2`
-- **Missing env var** — check all variables are set in Render's environment panel
-- **Port binding error** — make sure the start command uses `$PORT`
+**Render free tier cold start:**
+- Render spins down free services after 15 minutes of inactivity
+- The first request after idle takes ~30 seconds to wake the app up
+- This is expected behavior — acceptable for a demo
 
 ---
 
-## Task B-2: Verify CloudAMQP connection from Render — Person B
+## Task B — Deploy backend to Render (Person B)
 
-1. CloudAMQP is already set up from Milestone 3. Copy your AMQP URL.
-2. Add it as `RABBITMQ_URL` in Render's environment variables (done in Task B-1 Step 4).
-3. After deploy, check the Render logs for:
-   ```
-   [RabbitMQ] Waiting for messages on queue 'fetch_promotions'...
-   [LISTEN] Subscribed to 'new_promotion' channel
-   ```
-4. Check your CloudAMQP dashboard → RabbitMQ Manager → Connections — you should see one active connection from Render.
+### Prepare the backend
 
-If the consumer fails to connect:
-- Double-check the AMQP URL in Render's env vars (no trailing spaces, correct format)
-- CloudAMQP free tier has a connection limit — make sure you're not exceeding it
+The app must start with a single shell command. Render needs to know:
+- Which directory to build from (`backend/`)
+- How to install dependencies (`pip install -r requirements.txt`)
+- How to start the app
+
+The start command must use `0.0.0.0` as the host and `$PORT` as the port:
+```
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Research: a `Procfile` is an optional file that some platforms use to define the start command. Render can also be configured via the dashboard UI.
+
+### Deploy steps
+
+1. Create a Render account at https://render.com
+2. **Database first:** New → PostgreSQL → Free plan. Copy the **Internal Database URL** after creation.
+3. **Web service:** New → Web Service → connect your GitHub repo
+   - Root Directory: `backend`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - Plan: Free
+4. Add all environment variables from your `.env` in the Render dashboard. Use the **Internal Database URL** for `DATABASE_URL` (both services are on Render's internal network — faster and free).
+5. Generate a secure `JWT_SECRET` — you can use Python locally:
+   ```bash
+   python3 -c "import secrets; print(secrets.token_hex(32))"
+   ```
+6. Deploy and watch the build logs.
+
+### Common build errors to watch for
+
+- `psycopg2` fails to build → make sure you are using `psycopg2-binary` in `requirements.txt`, not `psycopg2`
+- App crashes on startup → check all required env vars are set in the Render dashboard
+- App binds to wrong port → ensure the start command uses `$PORT`
+
+### Verify CloudAMQP from Render
+
+After deploy, check the Render logs for the RabbitMQ consumer and PostgreSQL listener startup messages. Check your CloudAMQP dashboard → Connections to confirm the app connected.
 
 ---
 
-## Task C-1: Deploy frontend to Vercel — Person C
+## Task C — Deploy frontend to Vercel (Person C)
 
-### Step 1: Prepare the frontend
+### Prepare the frontend
 
-Create `frontend/.env.production` (or set env vars in Vercel):
+Create a `frontend/.env.production` file (not committed — set via Vercel's dashboard):
 ```
-VITE_API_URL=https://your-backend.onrender.com
+VITE_API_URL=https://your-app-name.onrender.com
 ```
 
-Replace `your-backend.onrender.com` with the actual URL from Render.
+Replace with your actual Render backend URL.
 
-### Step 2: Deploy to Vercel
+### Deploy steps
 
-1. Go to https://vercel.com → New Project → Import from GitHub
-2. Select your repo → set **Root Directory** to `frontend`
-3. Framework preset: **Vite** (Vercel detects it automatically)
-4. Add environment variable:
-   - `VITE_API_URL` = `https://your-backend.onrender.com`
-5. Click Deploy
+1. Create a Vercel account at https://vercel.com
+2. New Project → Import from GitHub → select your repo
+3. Set Root Directory to `frontend`
+4. Vercel auto-detects Vite — no build command changes needed
+5. Add environment variable: `VITE_API_URL` = your Render backend URL
+6. Deploy
 
-### Step 3: Update CORS on the backend
+### After deploy: update CORS on the backend
 
-Once you have your Vercel URL (e.g., `https://promobot.vercel.app`), update `app/main.py`:
-
+Add your Vercel domain to `CORSMiddleware`'s `allow_origins` list in `app/main.py`:
 ```python
 allow_origins=[
     "http://localhost:5173",
-    "https://promobot.vercel.app",   # ← add your real Vercel URL
+    "https://your-app.vercel.app",  # ← add this
 ]
 ```
 
@@ -131,60 +108,60 @@ Commit and push — Render redeploys automatically.
 
 ## Smoke Test — All Members
 
-Go through this checklist on the **production URLs** (Vercel + Render), not localhost.
+Run through this checklist on the **live production URLs**, not localhost.
 
-### Auth flow
+### Auth
 - [ ] Open the Vercel URL → redirected to `/login`
 - [ ] Register a new account → redirected to `/niches`
 - [ ] Log out → redirected to `/login`
-- [ ] Log in with the same account → redirected to `/niches`
-- [ ] Try logging in with wrong password → error message shown
+- [ ] Log in with the same credentials → works
+- [ ] Log in with wrong password → error message shown, no navigation
 
 ### Niche subscription
 - [ ] `/niches` shows "Gym & Sports"
-- [ ] Check the niche → it stays checked on page refresh (stored in DB)
-- [ ] Uncheck the niche → unchecked state persists
+- [ ] Subscribe → stays checked on page refresh (persisted to DB)
+- [ ] Unsubscribe → unchecked state persists
 
 ### Promotion pipeline
-- [ ] Trigger the pipeline manually:
+- [ ] Trigger the pipeline on production:
   ```bash
-  curl -X POST https://your-backend.onrender.com/internal/fetch
+  curl -X POST https://your-app.onrender.com/internal/fetch
   ```
-- [ ] Navigate to `/promotions` → promotions appear with photo, title, prices, Gemini description, and buy button
-- [ ] Click "Buy now" → opens Mercado Livre in a new tab with affiliate URL (`matt_tool=` in the URL)
+- [ ] Navigate to `/promotions` → cards appear with all fields
+- [ ] "Buy now" opens a Mercado Livre URL with `matt_tool=` in the query string
 
 ### Integration checks
-- [ ] CloudAMQP dashboard shows message activity after triggering fetch
-- [ ] Render logs show `[EVENT] New promotion inserted →` lines
-- [ ] Render logs show no error-level messages
+- [ ] CloudAMQP dashboard shows an active connection and message activity
+- [ ] Render logs show `[EVENT] New promotion inserted →` lines after triggering fetch
+- [ ] Render logs show no crash-level errors
 
-### Cold start
-- [ ] Wait 15 minutes (Render free tier spins down)
-- [ ] Open the app → first request takes ~30 seconds
-- [ ] After the app wakes up, everything works normally
+### Cold start (simulate before the demo)
+- [ ] Leave the app idle for 15+ minutes
+- [ ] Open the Vercel URL → the first load may be slow while Render wakes up
+- [ ] After the app is awake, everything works normally
 
 ---
 
-## Common production issues and fixes
+## Common production issues
 
-| Issue | Likely cause | Fix |
+| Symptom | Likely cause | Where to look |
 |---|---|---|
-| `502 Bad Gateway` on Render | App crashed on startup | Check Render logs for Python errors |
-| CORS error in browser console | Vercel URL not in `allow_origins` | Update CORS and redeploy backend |
-| `401` on all requests | `JWT_SECRET` mismatch or missing | Verify env var in Render |
-| No promotions after fetch | ML or Gemini API key wrong | Check Render env vars, check ML/Gemini API dashboards |
-| RabbitMQ consumer not connecting | Wrong `RABBITMQ_URL` | Re-copy URL from CloudAMQP dashboard |
-| Vercel build fails | Missing `VITE_API_URL` | Add env var in Vercel project settings |
-| Database tables not created | `create_all` not running | Check startup logs in Render |
+| 502 Bad Gateway | App crashed on startup | Render → Logs |
+| CORS error in browser console | Vercel URL missing from `allow_origins` | Update `main.py`, redeploy |
+| 401 on all requests | `JWT_SECRET` env var wrong or missing | Render → Environment |
+| No promotions after fetch | ML or Gemini API key wrong | Render → Environment; API dashboards |
+| RabbitMQ not connecting | Wrong `RABBITMQ_URL` | Re-copy from CloudAMQP dashboard |
+| Vercel build fails | Missing `VITE_API_URL` | Vercel → Project → Environment Variables |
+| DB tables not created | Startup crash before `create_all` | Render → Logs |
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Backend is live on Render (`GET /health` returns `{"status": "ok"}`)
-- [ ] Frontend is live on Vercel and loads without console errors
+- [ ] `GET https://your-app.onrender.com/health` returns `{"status": "ok"}`
+- [ ] The Vercel frontend loads without errors in the browser console
 - [ ] Full user journey works end-to-end on production URLs
-- [ ] Affiliate links contain the affiliate ID
-- [ ] CloudAMQP shows active connection and message throughput
-- [ ] Render logs show both RabbitMQ consumer and PostgreSQL LISTEN activity
-- [ ] No `.env` files or secrets are committed to the repository
+- [ ] Affiliate links contain the affiliate ID parameter
+- [ ] CloudAMQP shows an active connection
+- [ ] Render logs show RabbitMQ consumer and PostgreSQL LISTEN startup messages
+- [ ] No secrets are committed to the repository (verify with `git log --all -- .env`)

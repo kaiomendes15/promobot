@@ -10,302 +10,126 @@
 
 ## What changes in this milestone
 
-Every `TODO M4` comment left in the React shell gets implemented. The static mock data is replaced with real Axios calls to the FastAPI backend.
+Every `// TODO M4` comment left in the static shell gets implemented. Mock data is replaced with real Axios calls.
 
 ---
 
-## Task C-1: Wire Register page — Person C
+## Concepts to research
 
-**File:** `src/pages/Register.jsx`
+**React state and effects:**
+- `useState` — storing form values, loaded data, loading flags, error messages
+- `useEffect` — running code when a component mounts (the right place to fetch data on page load)
+- Dependency array in `useEffect`: `[]` means "run once on mount", `[value]` means "run when value changes"
 
-Replace the mock `handleSubmit` with a real API call:
+**Async calls in React:**
+- `useEffect` cannot be `async` directly — research the correct pattern for calling async functions inside `useEffect`
+- Handling loading state: set a `loading` flag to `true` before the call, `false` after (in a `finally` block)
+- Handling errors: catch the error and store a message in state to display to the user
 
-```jsx
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import api from "../api/client";
+**Axios response and error structure:**
+- `response.data` — the parsed JSON body
+- `error.response?.data?.detail` — the FastAPI error message (e.g., "Email already registered")
+- `error.response?.status` — the HTTP status code
 
-export default function Register() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+**`Promise.all`:**
+- When two API calls are independent, run them in parallel instead of sequentially
+- `const [resultA, resultB] = await Promise.all([api.get('/a'), api.get('/b')])`
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      const { data } = await api.post("/auth/register", { email, password });
-      localStorage.setItem("token", data.access_token);
-      navigate("/niches");
-    } catch (err) {
-      setError(err.response?.data?.detail || "Registration failed. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
+**CORS:**
+- When the React app (port 5173) calls the backend (port 8000), the browser enforces the Same-Origin Policy
+- The backend must explicitly allow the frontend's origin via CORS headers
+- Research FastAPI's `CORSMiddleware`
 
-  return (
-    <form onSubmit={handleSubmit}>
-      <h1>Create account</h1>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-      <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required />
-      <button type="submit" disabled={loading}>{loading ? "Creating..." : "Create account"}</button>
-      <p>Already have an account? <Link to="/login">Login</Link></p>
-    </form>
-  );
-}
-```
-
-**Key points:**
-- The token returned by `/auth/register` is stored immediately in `localStorage` — the user is logged in as soon as they register.
-- `err.response?.data?.detail` reads the FastAPI error message (e.g., "Email already registered") and shows it to the user.
-- `disabled={loading}` prevents double-submits.
+**Suggested reading:**
+- React `useEffect`: https://react.dev/reference/react/useEffect
+- React forms: https://react.dev/learn/reacting-to-input-with-state
+- Axios error handling: https://axios-http.com/docs/handling_errors
 
 ---
 
-## Task C-2: Wire Login page — Person C
+## Task breakdown
 
-**File:** `src/pages/Login.jsx`
+### Person C — Register and Login pages
 
-Same pattern as Register, but calling `POST /auth/login`:
+Wire the form submit handlers to real API calls:
+- Register: `POST /auth/register` with `{ email, password }` → store the returned token in `localStorage` → navigate to `/niches`
+- Login: same flow with `POST /auth/login`
 
-```jsx
-const { data } = await api.post("/auth/login", { email, password });
-localStorage.setItem("token", data.access_token);
-navigate("/niches");
-```
+Both pages should:
+- Show a loading indicator while the request is in flight (disable the submit button)
+- Show the error message from the API response if the request fails (e.g., "Email already registered")
+- Not navigate anywhere on error
 
-Also add a **Logout** utility. When the user logs out, remove the token and redirect:
-```jsx
-function logout() {
-  localStorage.removeItem("token");
-  navigate("/login");
-}
-```
+Add a logout function somewhere accessible (a button in a header or nav): remove the token from `localStorage` and navigate to `/login`.
 
-You can add a logout button in a shared navbar or header component.
+### Person A — Niches page
 
----
+Replace the hardcoded niche list with real data:
+- On mount, fetch all available niches from `GET /users/niches` **and** the user's current subscriptions from `GET /users/me/niches` in parallel
+- Track which niches are subscribed using a `Set` of IDs in state
+- When a checkbox is toggled:
+  - If the niche was subscribed: call `DELETE /users/me/niches/:id`
+  - If not subscribed: call `POST /users/me/niches/:id`
+  - Update local state immediately so the UI responds without waiting for a refetch
 
-## Task A-1: Wire Niches page — Person A
+Think about: what should happen if the toggle call fails? Should the checkbox snap back?
 
-**File:** `src/pages/Niches.jsx`
+### Person C — Promotions feed
 
-Replace the hardcoded `MOCK_NICHES` with real API data, and subscribe/unsubscribe with real calls.
+Replace mock promotions with real data from `GET /promotions`:
+- On mount, call the endpoint and store the results in state
+- Show a loading state while fetching
+- Show a "No active promotions for your niches — check back soon!" message if the array is empty
+- Render each promotion card with: product photo, title, original price (struck through), promo price, discount percentage, Gemini description, and a "Buy now" link
 
-```jsx
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../api/client";
+For the "Buy now" link: open in a new tab. Research why `rel="noopener noreferrer"` should be added to external links that open with `target="_blank"`.
 
-export default function Niches() {
-  const [allNiches, setAllNiches] = useState([]);
-  const [subscribedIds, setSubscribedIds] = useState(new Set());
-  const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+For prices: use `Number(price).toFixed(2)` to format prices as strings with two decimal places.
 
-  useEffect(() => {
-    async function load() {
-      const [allRes, myRes] = await Promise.all([
-        api.get("/users/niches"),
-        api.get("/users/me/niches"),
-      ]);
-      setAllNiches(allRes.data);
-      setSubscribedIds(new Set(myRes.data.map(n => n.id)));
-      setLoading(false);
-    }
-    load();
-  }, []);
+### Person B — CORS configuration
 
-  async function toggleNiche(niche) {
-    if (subscribedIds.has(niche.id)) {
-      await api.delete(`/users/me/niches/${niche.id}`);
-      setSubscribedIds(prev => { const next = new Set(prev); next.delete(niche.id); return next; });
-    } else {
-      await api.post(`/users/me/niches/${niche.id}`);
-      setSubscribedIds(prev => new Set([...prev, niche.id]));
-    }
-  }
+Add `CORSMiddleware` to `app/main.py`:
+- Allow `http://localhost:5173` for local development
+- Allow your Vercel URL (add it after Milestone 5 deploy)
+- Allow credentials, all methods, all headers
 
-  if (loading) return <p>Loading niches...</p>;
+Research: where in `main.py` middleware should be added relative to route registration.
 
-  return (
-    <div>
-      <h1>Choose your niches</h1>
-      {allNiches.map(niche => (
-        <label key={niche.id}>
-          <input
-            type="checkbox"
-            checked={subscribedIds.has(niche.id)}
-            onChange={() => toggleNiche(niche)}
-          />
-          {niche.name}
-        </label>
-      ))}
-      <button onClick={() => navigate("/promotions")}>See promotions</button>
-    </div>
-  );
-}
-```
+### All members — Global 401 handling
 
-**Why `Promise.all`?** It fires both API calls simultaneously instead of sequentially — the page loads faster.
+Add a response interceptor to the Axios client that:
+- Catches any 401 response from any endpoint
+- Removes the token from `localStorage`
+- Redirects the user to `/login`
+
+This means expired tokens are handled automatically everywhere, without needing error handling in every individual component.
 
 ---
 
-## Task C-3: Wire Promotions feed — Person C
+## Manual end-to-end test
 
-**File:** `src/pages/Promotions.jsx`
+Walk through the full user journey manually after wiring everything up:
 
-Replace mock promotions with real data from `GET /promotions`.
-
-```jsx
-import { useState, useEffect } from "react";
-import api from "../api/client";
-
-export default function Promotions() {
-  const [promotions, setPromotions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    api.get("/promotions")
-      .then(res => setPromotions(res.data))
-      .catch(() => setError("Failed to load promotions."))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <p>Loading promotions...</p>;
-  if (error) return <p>{error}</p>;
-  if (promotions.length === 0) return <p>No active promotions for your niches. Check back soon!</p>;
-
-  return (
-    <div>
-      <h1>Today's Deals</h1>
-      {promotions.map(promo => (
-        <PromotionCard key={promo.id} promo={promo} />
-      ))}
-    </div>
-  );
-}
-
-function PromotionCard({ promo }) {
-  const discount = Math.round((1 - promo.promo_price / promo.original_price) * 100);
-
-  return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginBottom: 16 }}>
-      {promo.product.photo_url && (
-        <img src={promo.product.photo_url} alt={promo.product.title} style={{ width: 200 }} />
-      )}
-      <h2>{promo.product.title}</h2>
-      <p>{promo.product.gemini_description}</p>
-      <p>
-        <s>R$ {Number(promo.original_price).toFixed(2)}</s>
-        {" → "}
-        <strong>R$ {Number(promo.promo_price).toFixed(2)}</strong>
-        {" "}
-        <span style={{ color: "green" }}>({discount}% off)</span>
-      </p>
-      <a href={promo.affiliate_url} target="_blank" rel="noopener noreferrer">
-        <button>Buy now</button>
-      </a>
-    </div>
-  );
-}
-```
-
-**Why `rel="noopener noreferrer"` on the affiliate link?** Security best practice for links that open in a new tab — prevents the opened page from accessing `window.opener`.
-
----
-
-## Task B-1: CORS configuration — Person B
-
-When the React app (running on Vercel or `localhost:5173`) makes requests to the FastAPI backend (on Render or `localhost:8000`), the browser blocks cross-origin requests unless the backend explicitly allows them.
-
-Add CORS middleware to `app/main.py`:
-
-```python
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",        # local Vite dev server
-        "https://your-app.vercel.app",  # production frontend (update after Vercel deploy)
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
-
-**When to update `allow_origins`:** After deploying to Vercel in Milestone 5, add your real Vercel URL here and redeploy the backend.
-
----
-
-## Shared tasks (any member)
-
-### Handle auth expiry globally
-
-If the JWT expires (after 24h), all API calls will return 401. Add an Axios response interceptor to handle this automatically:
-
-```javascript
-// src/api/client.js — add after the request interceptor
-
-api.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      window.location.href = "/login";
-    }
-    return Promise.reject(error);
-  }
-);
-```
-
-This redirects any 401 response to the login page, regardless of which page triggered the call.
-
-### Loading and empty states
-
-Every data-fetching component should handle three states:
-1. **Loading** — show a spinner or "Loading..." text while the request is in flight.
-2. **Empty** — show a helpful message if the array is empty (e.g., "No promotions yet — check back soon!").
-3. **Error** — show a human-readable error message if the request fails.
-
-These are already in the code examples above. Make sure all pages follow this pattern.
-
----
-
-## Testing the full user journey
-
-Go through the complete flow manually:
-
-1. Open http://localhost:5173
-2. → Redirected to `/login` (no token)
-3. Click "Register" → fill in email + password → submit
-4. → Redirected to `/niches`
-5. Check "Gym & Sports" → click "See promotions"
-6. → Redirected to `/promotions`
-7. Should see real promotions from the DB (trigger `POST /internal/fetch` first if empty)
-8. Click "Buy now" → should open Mercado Livre in a new tab with affiliate URL
-9. Refresh the page → promotions still show (token persists in localStorage)
-10. Test logout → token removed → next visit redirects to login
+1. Open the app → redirected to `/login`
+2. Register a new account → redirected to `/niches`
+3. Subscribe to "Gym & Sports" → checkbox reflects the change
+4. Click "See promotions" → promotions feed loads (trigger `POST /internal/fetch` first if empty)
+5. Verify: photo, title, original price struck through, promo price, Gemini description, affiliate URL button
+6. Click "Buy now" → Mercado Livre opens in a new tab with `matt_tool=` in the URL
+7. Refresh the page → still logged in (token persists in localStorage)
+8. Log out → redirected to `/login` → `/promotions` is inaccessible
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] Register creates a real user in the DB and logs in automatically
-- [ ] Login with wrong password shows an error message, does not redirect
-- [ ] Niches page shows real niches from the DB (not hardcoded)
-- [ ] Subscribing/unsubscribing a niche updates the DB and reflects immediately in the UI
-- [ ] Promotions page shows real promotions with photo, title, original price, promo price, Gemini description, and affiliate link
-- [ ] Promotions page shows an empty state message when no promotions exist
-- [ ] "Buy now" opens the correct Mercado Livre affiliate URL in a new tab
-- [ ] A 401 error (expired token or logged-out user) redirects to `/login`
-- [ ] The promotions page is not accessible without a token (protected route)
+- [ ] Register creates a real user and logs in automatically
+- [ ] Login with wrong password shows the API error message, no navigation
+- [ ] Niches page shows real niches from the database
+- [ ] Subscribing and unsubscribing persists to the database and reflects immediately in the UI
+- [ ] Promotions page shows real data with all fields
+- [ ] Empty state message shows when no promotions exist
+- [ ] "Buy now" opens the correct affiliate URL in a new tab
+- [ ] A 401 response on any endpoint redirects to `/login`
+- [ ] Protected pages redirect to `/login` when there is no token
 - [ ] CORS does not block requests from `localhost:5173` to `localhost:8000`
