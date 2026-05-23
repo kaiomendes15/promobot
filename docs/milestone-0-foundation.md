@@ -11,7 +11,7 @@
 ## Prerequisites
 
 - Python 3.12 installed
-- PostgreSQL 16 installed locally (or use a Docker container just for the DB)
+- **Docker + Docker Compose installed** (replaces local PostgreSQL — see Task 6)
 - Node.js 18+ installed (for frontend later)
 - Git configured
 
@@ -55,6 +55,8 @@ venv/
 node_modules/
 dist/
 ```
+
+`docker-compose.yml` **is committed** — everyone uses it. Docker volume data lives outside the repo and is never committed.
 
 **`.env.example`** (commit this, never commit `.env`):
 ```bash
@@ -264,23 +266,34 @@ def health():
 
 ---
 
-### 6. Create the local database
+### 6. Start the database with Docker Compose
+
+No manual PostgreSQL setup needed. The `docker-compose.yml` at the project root spins up PostgreSQL 16 with the correct database name, user, and password already configured.
 
 ```bash
-# Open PostgreSQL
-psql -U postgres
-
-# Inside psql:
-CREATE DATABASE promobot;
-CREATE USER promobot_user WITH PASSWORD 'promobot_pass';
-GRANT ALL PRIVILEGES ON DATABASE promobot TO promobot_user;
-\q
+# From the project root (where docker-compose.yml lives)
+docker compose up -d
 ```
 
-Update your `.env`:
+The `-d` flag runs it in the background. The database is now available at `localhost:5432`.
+
+Your `.env` should already have:
 ```
 DATABASE_URL=postgresql://promobot_user:promobot_pass@localhost:5432/promobot
 ```
+
+**Useful commands:**
+```bash
+docker compose up -d       # start the DB
+docker compose down        # stop and remove the container (data is preserved in the volume)
+docker compose down -v     # stop and delete all data (full reset)
+docker compose logs db     # view PostgreSQL logs
+```
+
+**Why a named volume (`postgres_data`)?**  
+Docker volumes persist data between container restarts. If you run `docker compose down` and `up` again, your data is still there. Only `docker compose down -v` wipes it — useful when you want a clean slate.
+
+**All members use the same credentials** — no one needs to create users or databases manually.
 
 ---
 
@@ -308,10 +321,10 @@ Open the auto-generated docs: http://localhost:8000/docs
 
 Verify tables were created:
 ```bash
-psql -U promobot_user -d promobot -c "\dt"
+docker compose exec db psql -U promobot_user -d promobot -c "\dt"
 # Should list: niches, users, user_niches, products, promotions
 
-psql -U promobot_user -d promobot -c "SELECT * FROM niches;"
+docker compose exec db psql -U promobot_user -d promobot -c "SELECT * FROM niches;"
 # Should show: 1 | Gym & Sports | MS174162
 ```
 
