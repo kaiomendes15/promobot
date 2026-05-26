@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { BrandLogo } from './BrandLogo'
 
 interface NavItem {
   label: string
@@ -16,8 +17,8 @@ export function Header({ logo, navItems = [], actions }: HeaderProps) {
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/90 backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
         <div className="flex items-center gap-8">
-          <div className="text-violet-600 font-semibold text-lg tracking-tight">
-            {logo ?? 'PromoBot'}
+          <div>
+            {logo ?? <BrandLogo size="sm" />}
           </div>
 
           {navItems.length > 0 && (
