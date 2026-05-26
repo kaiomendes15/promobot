@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.auth import get_current_user
+from app.auth_config import get_current_user
 from app.database import get_db
 from app.models.niche import Niche
 from app.models.user import User
-from app.schemas.user import NicheResponse
+from app.schemas.user_schema import NicheResponse
 
 router = APIRouter(prefix="/users", tags=["users"])
 

@@ -2,8 +2,10 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.database import Base, engine
 from app.models.niche import Niche
-from app.routers import auth, users
+from app.routers import users_router
 from sqlalchemy.orm import Session
+
+from app.routers import auth_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,8 +23,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(auth.router)
-app.include_router(users.router)
+app.include_router(auth_router.router)
+app.include_router(users_router.router)
 
 @app.get("/")
 async def root():
