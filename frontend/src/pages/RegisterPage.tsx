@@ -65,6 +65,10 @@ export default function RegisterPage() {
                     <Button 
                         type="submit"
                         disabled={!isFormValid}
+                        onClick={() => {
+                            // Lógica para enviar os dados de registro para o backend
+                            console.log('Registrando usuário:', { email, username, password })
+                        }}
                     >
                         Criar conta
                     </Button>
