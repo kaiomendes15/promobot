@@ -11,20 +11,20 @@ interface AlertProps {
 
 const styles: Record<AlertVariant, { wrapper: string; icon: string }> = {
   info: {
-    wrapper: 'bg-violet-50 border-violet-200 text-violet-800',
-    icon: 'text-violet-500',
+    wrapper: 'bg-blue-500/10 border-blue-500/20 text-blue-200',
+    icon: 'text-blue-400',
   },
   success: {
-    wrapper: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-    icon: 'text-emerald-500',
+    wrapper: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-200',
+    icon: 'text-emerald-400',
   },
   warning: {
-    wrapper: 'bg-amber-50 border-amber-200 text-amber-800',
-    icon: 'text-amber-500',
+    wrapper: 'bg-amber-400/10 border-amber-400/20 text-amber-200',
+    icon: 'text-amber-400',
   },
   error: {
-    wrapper: 'bg-red-50 border-red-200 text-red-800',
-    icon: 'text-red-500',
+    wrapper: 'bg-rose-500/10 border-rose-500/20 text-rose-200',
+    icon: 'text-rose-400',
   },
 }
 
@@ -51,30 +51,23 @@ const icons: Record<AlertVariant, ReactNode> = {
   ),
 }
 
-export function Alert({
-  variant = 'info',
-  title,
-  children,
-  onDismiss,
-}: AlertProps) {
+export function Alert({ variant = 'info', title, children, onDismiss }: AlertProps) {
   const { wrapper, icon } = styles[variant]
 
   return (
     <div className={['flex gap-3 rounded-lg border p-4', wrapper].join(' ')}>
-      <span className={['mt-0.5 shrink-0', icon].join(' ')}>
-        {icons[variant]}
-      </span>
+      <span className={['mt-0.5 shrink-0', icon].join(' ')}>{icons[variant]}</span>
 
       <div className="flex-1 text-sm">
         {title && <p className="font-semibold mb-0.5">{title}</p>}
-        <div className="leading-relaxed">{children}</div>
+        <div className="leading-relaxed opacity-80">{children}</div>
       </div>
 
       {onDismiss && (
         <button
           type="button"
           onClick={onDismiss}
-          className="shrink-0 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+          className="shrink-0 opacity-50 hover:opacity-100 transition-opacity cursor-pointer"
           aria-label="Fechar"
         >
           <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">

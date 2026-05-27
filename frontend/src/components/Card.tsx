@@ -12,17 +12,12 @@ const paddingClasses = {
   lg: 'p-7',
 }
 
-export function Card({
-  children,
-  padding = 'md',
-  className = '',
-  ...props
-}: CardProps) {
+export function Card({ children, padding = 'md', className = '', ...props }: CardProps) {
   return (
     <div
       {...props}
       className={[
-        'rounded-xl border border-gray-200 bg-white shadow-sm',
+        'rounded-xl border border-zinc-800 bg-zinc-900',
         paddingClasses[padding],
         className,
       ].join(' ')}

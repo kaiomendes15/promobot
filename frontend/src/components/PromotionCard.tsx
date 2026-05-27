@@ -32,15 +32,11 @@ export function PromotionCard({
   const discount = discountPercent(originalPrice, promoPrice)
 
   return (
-    <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200">
-      <div className="relative bg-gray-50 flex items-center justify-center h-48">
-        <img
-          src={photoUrl}
-          alt={title}
-          className="h-full w-full object-contain p-4"
-        />
+    <div className="group flex flex-col rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden transition-all duration-250 hover:border-amber-400/25 hover:shadow-[0_0_40px_rgba(245,158,11,0.07)]">
+      <div className="relative bg-zinc-800 flex items-center justify-center h-48">
+        <img src={photoUrl} alt={title} className="h-full w-full object-contain p-4 opacity-90 group-hover:opacity-100 transition-opacity duration-200" />
         {discount > 0 && (
-          <span className="absolute top-3 right-3 bg-violet-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
+          <span className="absolute top-3 right-3 bg-amber-400 text-zinc-950 text-xs font-bold px-2 py-1 rounded-full font-display">
             -{discount}%
           </span>
         )}
@@ -48,38 +44,36 @@ export function PromotionCard({
 
       <div className="flex flex-col gap-3 p-4 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-medium text-gray-900 line-clamp-2 leading-snug">
+          <h3 className="text-sm font-medium text-zinc-100 line-clamp-2 leading-snug">
             {title}
           </h3>
-          {niche && <Badge variant="purple">{niche}</Badge>}
+          {niche && <Badge variant="amber">{niche}</Badge>}
         </div>
 
         {geminiDescription && (
-          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+          <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
             {geminiDescription}
           </p>
         )}
 
         <div className="flex items-baseline gap-2 mt-auto">
-          <span className="text-xl font-bold text-violet-600">
+          <span className="text-xl font-bold text-amber-400 font-display">
             {formatPrice(promoPrice)}
           </span>
           {originalPrice > promoPrice && (
-            <span className="text-sm text-gray-400 line-through">
+            <span className="text-sm text-zinc-600 line-through">
               {formatPrice(originalPrice)}
             </span>
           )}
         </div>
 
-        {store && (
-          <p className="text-xs text-gray-400">Vendido por {store}</p>
-        )}
+        {store && <p className="text-xs text-zinc-600">Vendido por {store}</p>}
 
         <a
           href={affiliateUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-1 inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 active:bg-violet-800 transition-colors duration-150"
+          className="mt-1 inline-flex items-center justify-center rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-300 active:bg-amber-500 transition-colors duration-150 font-display"
         >
           Ver oferta
         </a>

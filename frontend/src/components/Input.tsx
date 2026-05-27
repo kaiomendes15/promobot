@@ -23,17 +23,14 @@ export function Input({
   return (
     <div className="flex flex-col gap-1.5 w-full">
       {label && (
-        <label
-          htmlFor={inputId}
-          className="text-sm font-medium text-gray-700"
-        >
+        <label htmlFor={inputId} className="text-sm font-medium text-zinc-300">
           {label}
         </label>
       )}
 
       <div className="relative flex items-center">
         {leftIcon && (
-          <span className="absolute left-3 text-gray-400 pointer-events-none">
+          <span className="absolute left-3 text-zinc-500 pointer-events-none">
             {leftIcon}
           </span>
         )}
@@ -42,12 +39,14 @@ export function Input({
           id={inputId}
           {...props}
           className={[
-            'w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900',
-            'placeholder:text-gray-400',
+            'w-full rounded-lg border bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100',
+            'placeholder:text-zinc-600',
             'transition-colors duration-150',
-            'focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500',
-            'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50',
-            error ? 'border-red-400' : 'border-gray-300 hover:border-gray-400',
+            'focus:outline-none focus:ring-2 focus:ring-amber-400/40 focus:border-amber-400/50',
+            'disabled:opacity-40 disabled:cursor-not-allowed',
+            error
+              ? 'border-rose-500/60 focus:ring-rose-500/30'
+              : 'border-zinc-700 hover:border-zinc-600',
             leftIcon ? 'pl-9' : '',
             rightIcon ? 'pr-9' : '',
             className,
@@ -55,14 +54,14 @@ export function Input({
         />
 
         {rightIcon && (
-          <span className="absolute right-3 text-gray-400 pointer-events-none">
+          <span className="absolute right-3 text-zinc-500 pointer-events-none">
             {rightIcon}
           </span>
         )}
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
-      {hint && !error && <p className="text-xs text-gray-500">{hint}</p>}
+      {error && <p className="text-xs text-rose-400">{error}</p>}
+      {hint && !error && <p className="text-xs text-zinc-500">{hint}</p>}
     </div>
   )
 }

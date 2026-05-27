@@ -10,12 +10,9 @@ const sizeClasses = {
 
 export function BrandLogo({ size = 'sm', className = '' }: BrandLogoProps) {
   return (
-    <span
-      className={[sizeClasses[size], className].join(' ')}
-      style={{ textShadow: '0 2px 6px rgba(0,0,0,0.10)' }}
-    >
-      <span className="text-gray-900">PROMO</span>
-      <span className="text-violet-600">BOT</span>
+    <span className={['font-display', sizeClasses[size], className].join(' ')}>
+      <span className="text-zinc-100">PROMO</span>
+      <span className="text-amber-400">BOT</span>
     </span>
   )
 }
