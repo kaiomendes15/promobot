@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router'
+import { createBrowserRouter, RouterProvider } from 'react-router'
 import './index.css'
 
 import Layout from './components/Layout'
@@ -9,8 +9,18 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import NichesPage from './pages/NichesPage'
 import PromotionsPage from './pages/PromotionsPage'
+import HomePage from './pages/HomePage'
+import App from './App'
 
 const router = createBrowserRouter([
+  {
+    path: '/design',
+    element: <App />,
+  },
+  {
+    path: '/',
+    element: <HomePage />,
+  },
   {
     path: '/login',
     element: <LoginPage />,
@@ -25,9 +35,8 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          { index: true, element: <Navigate to="/promotions" replace /> },
-          { path: 'promotions', element: <PromotionsPage /> }, // protected
-          { path: 'niches', element: <NichesPage /> }, // protected
+          { path: 'promotions', element: <PromotionsPage /> },
+          { path: 'niches', element: <NichesPage /> },
         ],
       },
     ],
