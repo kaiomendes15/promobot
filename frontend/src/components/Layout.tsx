@@ -1,6 +1,7 @@
-import { Outlet, Link } from 'react-router'
+import { Outlet, useNavigate } from 'react-router'
 import { Header } from './Header'
 import { Button } from './Button'
+import { tokenStorage } from '../api/client'
 
 const NAV_ITEMS = [
   { label: 'Promoções', href: '/promotions' },
@@ -8,14 +9,19 @@ const NAV_ITEMS = [
 ]
 
 export default function Layout() {
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    tokenStorage.clear()
+    navigate('/login')
+  }
+
   return (
     <>
       <Header
         navItems={NAV_ITEMS}
         actions={
-          <Link to="/login">
-            <Button variant="ghost" size="sm">Sair</Button>
-          </Link>
+          <Button variant="ghost" size="sm" onClick={handleLogout}>Sair</Button>
         }
       />
       <Outlet />

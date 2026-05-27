@@ -4,18 +4,34 @@ import { Card } from '../components/Card'
 import { Input } from '../components/Input'
 import { Button } from '../components/Button'
 import { Link, useNavigate } from 'react-router'
-import { MOCK_USERS } from '../mocks/users'
+import { login } from '../api/auth'
+import { tokenStorage } from '../api/client'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const isEmailValid = email.includes('@') && email.trim() !== ''
   const isPasswordNotEmpty = password.length > 0
   const isFormValid = isEmailValid && isPasswordNotEmpty
 
-  const [loginError, setLoginError] = useState(false)
+  async function handleLogin() {
+    setLoading(true)
+    try {
+      const { access_token } = await login(email, password)
+      tokenStorage.set(access_token)
+      navigate('/promotions')
+    } catch {
+      setEmail('')
+      setPassword('')
+      setLoginError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
         <main className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4">
@@ -43,21 +59,10 @@ export default function LoginPage() {
                     )}
                     <Button
                         type="submit"
-                        disabled={!isFormValid}
-                        onClick={() => {
-                            const user = MOCK_USERS.find(u => u.email === email)
-                            if (user && user.hashed_password === password) {
-                                setLoginError(false)
-                                localStorage.setItem('token', 'mock_token')
-                                navigate('/promotions')
-                            } else {
-                                setEmail('')
-                                setPassword('')
-                                setLoginError(true)
-                            }
-                        }}
+                        disabled={!isFormValid || loading}
+                        onClick={handleLogin}
                     >
-                        Entrar
+                        {loading ? 'Entrando...' : 'Entrar'}
                     </Button>
                     <p className="text-sm text-gray-500">
                         Não possui conta?{' '}

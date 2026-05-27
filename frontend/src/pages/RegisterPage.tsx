@@ -1,13 +1,18 @@
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { Button, Card, Input } from "../components";
 import { BrandLogo } from "../components/BrandLogo";
 import { useState } from 'react';
+import { register } from '../api/auth';
+import { tokenStorage } from '../api/client';
 
 export default function RegisterPage() {
+    const navigate = useNavigate()
     const [email, setEmail] = useState('')
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [registerError, setRegisterError] = useState<string | null>(null)
+    const [loading, setLoading] = useState(false)
 
     const isEmailValid = email.includes('@') && email.trim() !== ''
     const isUsernameValid = username.trim().length >= 3
@@ -15,6 +20,22 @@ export default function RegisterPage() {
     const isConfirmPasswordValid = confirmPassword === password
 
     const isFormValid = isEmailValid && isUsernameValid && isPasswordValid && isConfirmPasswordValid
+
+    async function handleRegister() {
+        setLoading(true)
+        setRegisterError(null)
+        try {
+            const { access_token } = await register(email, username, password)
+            tokenStorage.set(access_token)
+            navigate('/promotions')
+        } catch (err: unknown) {
+            const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+            setRegisterError(detail === 'Email is already registered' ? 'Este email já está cadastrado.' : 'Erro ao criar conta. Tente novamente.')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     return (
         <main className="flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4">
             <div className="flex flex-col items-center gap-8 w-full max-w-lg">
@@ -62,15 +83,15 @@ export default function RegisterPage() {
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                     />
-                    <Button 
+                    {registerError && (
+                        <p className="text-sm text-red-500">{registerError}</p>
+                    )}
+                    <Button
                         type="submit"
-                        disabled={!isFormValid}
-                        onClick={() => {
-                            // Lógica para enviar os dados de registro para o backend
-                            console.log('Registrando usuário:', { email, username, password })
-                        }}
+                        disabled={!isFormValid || loading}
+                        onClick={handleRegister}
                     >
-                        Criar conta
+                        {loading ? 'Criando conta...' : 'Criar conta'}
                     </Button>
                     <p className="text-sm text-gray-500">
                         Já tem conta?{' '}
