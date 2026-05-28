@@ -18,7 +18,8 @@ Read each milestone doc before starting it, not while doing it.
 |---|---|---|---|
 | [milestone-0-foundation.md](milestone-0-foundation.md) | M0 | May 22–23 | Repo setup, FastAPI skeleton, SQLAlchemy models, DB seed |
 | [milestone-1-auth-react-shell.md](milestone-1-auth-react-shell.md) | M1 | May 24–25 | Auth endpoints (A+B) + static React pages (C) in parallel |
-| [milestone-2-promotion-pipeline.md](milestone-2-promotion-pipeline.md) | M2 | May 26–27 | Mercado Livre fetch + Gemini + DB pipeline |
+| [milestone-2a-ml-auth-setup.md](milestone-2a-ml-auth-setup.md) | M2A | May 26 (morning) | Mercado Livre OAuth bootstrap + token refresh chain |
+| [milestone-2b-promotion-pipeline.md](milestone-2b-promotion-pipeline.md) | M2B | May 26–27 | ML search + Gemini + DB pipeline + `GET /promotions` |
 | [milestone-3-integrations.md](milestone-3-integrations.md) | M3 | May 28–29 | RabbitMQ (aio-pika) + PostgreSQL LISTEN/NOTIFY |
 | [milestone-4-frontend-wiring.md](milestone-4-frontend-wiring.md) | M4 | May 30 | Connect all React pages to real endpoints |
 | [milestone-5-deploy.md](milestone-5-deploy.md) | M5 | May 31 | Render + Vercel + CloudAMQP + smoke test |
