@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
 import httpx
 from sqlalchemy.orm import Session
 from app.models.ml_credential import MLCredential
@@ -8,6 +9,7 @@ from app.models.ml_credential import MLCredential
 TOKEN_URL = "https://api.mercadolibre.com/oauth/token"
 TOKEN_REFRESH_MARGIN = timedelta(minutes=5)
 ML_CREDENTIAL_ID = 1
+ML_SEARCH_URL = "https://api.mercadolibre.com/sites/MLB/search"
 
 
 def _get_required_env(*names: str) -> str:
@@ -132,3 +134,54 @@ def get_access_token(db: Session) -> str:
         return credential.access_token
 
     return _refresh_tokens(db)
+
+
+async def search_promotions(
+    access_token: str,
+    category_id: str,
+    limit: int = 50,
+) -> list[dict]:
+    params = {
+        "category": category_id,
+        "sort": "price_discount_high",
+        "limit": limit,
+    }
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(ML_SEARCH_URL, params=params, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+
+    results = []
+    for item in data.get("results", []):
+        original_price = item.get("original_price")
+        price = item.get("price")
+
+        if not original_price or original_price <= price:
+            continue
+
+        thumbnail = (item.get("thumbnail") or "").replace("http://", "https://")
+
+        results.append({
+            "id": item["id"],
+            "title": item["title"],
+            "thumbnail": thumbnail,
+            "price": price,
+            "original_price": original_price,
+            "permalink": item["permalink"],
+        })
+
+    return results
+
+
+def build_affiliate_url(permalink: str) -> str:
+    affiliate_id = os.getenv("MERCADOLIVRE_AFFILIATE_ID") or os.getenv("ML_AFFILIATE_ID")
+    if not affiliate_id:
+        return permalink
+
+    parsed = urlparse(permalink)
+    params = parse_qs(parsed.query)
+    params["matt_tool"] = [affiliate_id]
+    new_query = urlencode(params, doseq=True)
+    return urlunparse(parsed._replace(query=new_query))
