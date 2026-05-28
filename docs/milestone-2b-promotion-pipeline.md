@@ -1,12 +1,13 @@
-# Milestone 2 — Promotion Pipeline
+# Milestone 2B — Promotion Pipeline
 
 **Days:** May 26–27  
 **Owners:** Person B leads · Person A (Gemini client) · Person C (wire GET /promotions to frontend if ready)  
 **Goal:** A working end-to-end pipeline that fetches promotions from Mercado Livre, generates a description with Gemini for each new product, builds an affiliate URL, and stores the result in the database. Triggered manually via an HTTP endpoint for now — RabbitMQ comes in Milestone 3.
 
-> **Prerequisite:** JWT middleware from Milestone 1 must be complete. The database models from Milestone 0 must be in place.
+> **Prerequisite:** **Milestone 2A (ML Auth Setup) must be complete first.** The backend must have a valid `MLCredential` row in the database before the pipeline can run. Also requires JWT middleware from Milestone 1 and database models from Milestone 0.
 
-**Read first:** [`stack-guide.md`](stack-guide.md) — sections on httpx and asyncpg (for context on async patterns).
+**Read first:** [`stack-guide.md`](stack-guide.md) — sections on httpx and asyncpg (for context on async patterns).  
+**ML API reference:** [`docs/mercadolivre-api/`](mercadolivre-api/) — authentication, search, categories.
 
 ---
 
@@ -38,11 +39,10 @@ Plus a `GET /promotions` endpoint that returns active promotions for the authent
 
 ### Concepts to research
 
-**Mercado Livre OAuth (Client Credentials flow):**
-- Create a free application at https://developers.mercadolivre.com.br
-- You get a `client_id` and `client_secret`
-- Server-to-server calls use the "client credentials" grant — you exchange your credentials for an access token via a POST request (no user login involved)
-- Tokens expire — research how to cache a token in memory and refresh it only when it expires
+**Mercado Livre auth — already handled in Milestone 2A:**
+- `get_access_token(db)` in `app/integrations/mercadolivre.py` returns a valid token
+- Call it at the start of the pipeline — do not re-implement token logic here
+- See [`docs/mercadolivre-api/02-authentication.md`](mercadolivre-api/02-authentication.md) for reference
 
 **httpx async client:**
 - Why use `async with httpx.AsyncClient()` instead of a module-level client
@@ -63,12 +63,13 @@ Plus a `GET /promotions` endpoint that returns active promotions for the authent
 
 ### Steps
 
-1. Obtain your `client_id` and `client_secret` from the ML developer portal.
-2. Write a function that exchanges credentials for an access token via POST.
-3. Add in-memory token caching — store the token and its expiry time; only refresh when it has expired.
-4. Write a function that calls the ML search endpoint with a category ID and returns a list of product dicts with the fields you need.
-5. Filter results to only include products with a genuine discount.
-6. Write the affiliate URL builder function.
+1. `get_access_token(db)` is already implemented in `app/integrations/mercadolivre.py` (Milestone 2A). Do not re-implement it.
+2. Add `search_promotions(access_token: str, category_id: str, limit: int = 50) -> list[dict]` to `app/integrations/mercadolivre.py`:
+   - Calls `GET https://api.mercadolibre.com/sites/MLB/search?category={category_id}&sort=price_discount_high&limit={limit}`
+   - Filters results: only items where `original_price` is not null and `original_price > price`
+   - Forces HTTPS on the `thumbnail` URL
+   - Returns a list of dicts with fields: `id`, `title`, `thumbnail`, `price`, `original_price`, `permalink`
+3. Add `build_affiliate_url(permalink: str) -> str` to the same file — appends `?matt_tool={MERCADOLIVRE_AFFILIATE_ID}` safely using `urllib.parse`.
 
 ---
 
@@ -144,6 +145,16 @@ Create `POST /internal/fetch`. It should:
 
 This is a **temporary endpoint** — it exists so you can test the pipeline without RabbitMQ. It will be replaced in Milestone 3.
 
+### DELETE /users/me/niches/{niche_id} endpoint
+
+Add to `routers/users_router.py`. It should:
+- Require authentication (`get_current_user`)
+- Return `404` if the niche doesn't exist
+- Remove the niche from the user's subscriptions if present (no-op if not subscribed)
+- Return `204 No Content` (no response body)
+
+This endpoint is consumed by the M4 Niches page — the frontend calls it when the user unchecks a subscribed niche.
+
 ### GET /promotions endpoint
 
 Create `GET /promotions`. It should:
@@ -189,3 +200,6 @@ Create `GET /promotions`. It should:
 - [ ] `GET /promotions` returns an empty array for a user with no subscribed niches
 - [ ] `GET /promotions` returns 401 without a valid JWT
 - [ ] The response includes nested product data (title, photo, description) — not just IDs
+- [ ] `DELETE /users/me/niches/{niche_id}` returns 204 and removes the subscription from the DB
+- [ ] `DELETE /users/me/niches/{niche_id}` on a non-subscribed niche returns 204 (idempotent)
+- [ ] `DELETE /users/me/niches/999` (non-existent niche) returns 404
