@@ -4,7 +4,7 @@
 **Owners:** Person B leads · Person A supports  
 **Goal:** The promotion pipeline is triggered by a RabbitMQ message (not a direct HTTP call), and new promotion inserts are observed via PostgreSQL LISTEN/NOTIFY. These are two of the three graded integration techniques.
 
-> **Prerequisite:** The full pipeline from Milestone 2 must be working. Person C continues wiring the frontend in parallel.
+> **Prerequisite:** Milestones 2A (ML Auth Setup) and 2B (Promotion Pipeline) must be working — the ML credentials must be bootstrapped in the DB and `POST /internal/fetch` must return promotions before starting this milestone. Person C continues wiring the frontend in parallel.
 
 **Read first:** [`stack-guide.md`](stack-guide.md) — sections on aio-pika and asyncpg.
 

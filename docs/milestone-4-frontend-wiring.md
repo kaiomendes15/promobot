@@ -4,7 +4,7 @@
 **Owners:** All 3 members  
 **Goal:** Replace all mock data in the React frontend with real API calls. Every page works end-to-end against the live backend.
 
-> **Prerequisite:** All backend endpoints from Milestones 1 and 2 must be working. The React shell from Milestone 1 (Track 2) must be in place.
+> **Prerequisite:** All backend endpoints from Milestones 1, 2A, and 2B must be working — including `GET /promotions`, `DELETE /users/me/niches/{niche_id}`, and `POST /internal/ml-connect`. The React shell from Milestone 1 (Track 2) must be in place.
 
 ---
 

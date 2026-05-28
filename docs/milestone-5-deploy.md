@@ -66,6 +66,26 @@ Research: a `Procfile` is an optional file that some platforms use to define the
 - App crashes on startup → check all required env vars are set in the Render dashboard
 - App binds to wrong port → ensure the start command uses `$PORT`
 
+### Bootstrap ML credentials in production
+
+The backend stores Mercado Livre tokens in the database. After deploying, those tokens do not exist yet — the app owner must authenticate once to seed them.
+
+1. Open the authorization URL in a browser (replace `$APP_ID` and `$REDIRECT_URI` with your values):
+   ```
+   https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$APP_ID&redirect_uri=$REDIRECT_URI&scope=read
+   ```
+2. Authorize → you are redirected with `?code=TG-xxxx` in the URL. Copy the code immediately — it expires in ~10 minutes.
+3. POST the code to your live backend:
+   ```bash
+   curl -X POST https://your-app.onrender.com/internal/ml-connect \
+     -H "Content-Type: application/json" \
+     -d '{"code": "TG-xxxx..."}'
+   ```
+4. Confirm the response includes `"message": "ML auth configured"` and an `expires_at` timestamp.
+5. From this point on, the backend auto-refreshes the token indefinitely — no further manual steps.
+
+> **Important:** If you redeploy and lose your database, repeat this step. If you scale to a new DB instance, repeat this step.
+
 ### Verify CloudAMQP from Render
 
 After deploy, check the Render logs for the RabbitMQ consumer and PostgreSQL listener startup messages. Check your CloudAMQP dashboard → Connections to confirm the app connected.
@@ -149,7 +169,7 @@ Run through this checklist on the **live production URLs**, not localhost.
 | 502 Bad Gateway | App crashed on startup | Render → Logs |
 | CORS error in browser console | Vercel URL missing from `allow_origins` | Update `main.py`, redeploy |
 | 401 on all requests | `JWT_SECRET` env var wrong or missing | Render → Environment |
-| No promotions after fetch | ML or Gemini API key wrong | Render → Environment; API dashboards |
+| No promotions after fetch | ML credentials not bootstrapped or API keys wrong | Run `POST /internal/ml-connect` bootstrap; check Render → Environment |
 | RabbitMQ not connecting | Wrong `RABBITMQ_URL` | Re-copy from CloudAMQP dashboard |
 | Vercel build fails | Missing `VITE_API_URL` | Vercel → Project → Environment Variables |
 | DB tables not created | Startup crash before `create_all` | Render → Logs |
