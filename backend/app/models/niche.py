@@ -8,7 +8,7 @@ class Niche(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    ml_category_id: Mapped[int]
+    ml_category_id: Mapped[str] = mapped_column(String(50), nullable=False)
 
     users: Mapped[list["User"]] = relationship(
         "User", secondary=user_niches, back_populates="niches"

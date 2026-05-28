@@ -5,3 +5,4 @@ from app.models.user import User
 from app.models.niche import Niche
 from app.models.product import Product
 from app.models.promotion import Promotion
+from app.models.ml_credential import MLCredential

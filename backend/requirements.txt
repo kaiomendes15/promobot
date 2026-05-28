@@ -6,4 +6,5 @@ python-dotenv
 PyJWT
 bcrypt
 email-validator
+httpx
 google-genai
