@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.routers import auth_router
+from app.routers import internal_router
 
 
 def _run_startup_migrations() -> None:
@@ -57,6 +58,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(users_router.router)
 app.include_router(promotions_router.router)
+app.include_router(internal_router.router)
 
 @app.get("/")
 async def root():
